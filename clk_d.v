@@ -8,31 +8,44 @@ module clkgen # (
       input             clkin_p,              // Clock input LVDS P-side
       input             clkin_n,              // Clock input LVDS N-side
       input             reset,                // Asynchronous interface reset
+
       output            rx_clkdiv2,           // RX clock div2 output
       output            rx_clkdiv8,           // RX clock div8 output
+
       output            cmt_locked,           // PLL/MMCM locked output
       output     [4:0]  rx_wr_addr,           // RX write_address output
       output            rx_reset,             // RX reset output
       output reg        rx_ready,             // RX ready output
+
       output            px_clk,               // Pixel clock output
       output     [4:0]  px_rd_addr,           // Pixel read address output
       output reg [2:0]  px_rd_seq,            // Pixel read sequence output
       output reg        px_ready              // Pixel data ready output
    );
+
 wire       clkin_p_i;
 wire       clkin_n_i;
 wire       clkin_p_d;
 wire       clkin_n_d;
-wire       px_pllmmcm;
-wire       rx_pllmmcm_div2;
-
+wire       px_mmcm;
+wire       mmcm_div2;
 wire       locked_and_idlyrdy;
 reg  [3:0] rx_reset_sync;
 reg  [3:0] px_reset_sync;
 wire       px_reset;
 
 //-----------------------------------------------------------------------------
-// Clock input
+// Asynchronous reset for px_ready output
+always @ (posedge px_clk or posedge px_reset) begin
+   if (px_reset) begin
+      px_ready   <= 3'h0;
+   end
+   else begin
+      px_ready   <= px_ready_int;
+   end
+end
+//-----------------------------------------------------------------------------
+// Clock input global diff buffer
 IBUFGDS_DIFF_OUT # ( .DIFF_TERM   (DIFF_TERM) )
    clk_input (
       .I                (clkin_p),
@@ -40,26 +53,26 @@ IBUFGDS_DIFF_OUT # ( .DIFF_TERM   (DIFF_TERM) )
       .O                (clkin_p_i),
       .OB               (clkin_n_i)
    );
-
 //-----------------------------------------------------------------------------
 // Instantitate a MMCM
 generate
-begin    // use an MMCM
-    MMCME3_BASE # (
+begin
+   MMCME3_BASE # (
          .CLKIN1_PERIOD      (CLKIN_PERIOD),
          .BANDWIDTH          ("OPTIMIZED"),
-         .CLKFBOUT_MULT_F    (7*VCO_MULTIPLIER),
+         .CLKFBOUT_MULT_F    (6*VCO_MULTIPLIER),
          .CLKFBOUT_PHASE     (0.0),
          .CLKOUT0_DIVIDE_F   (2*VCO_MULTIPLIER),
+
          .CLKOUT0_DUTY_CYCLE (0.5),
          .CLKOUT0_PHASE      (0.0),
          .DIVCLK_DIVIDE      (1),
-         .REF_JITTER1        (0.100)
+         .REF_JITTER1        ()
     )
-    rx_mmcm_adv_inst (
-         .CLKFBOUT       (px_pllmmcm),
+   mmcm0 (
+         .CLKFBOUT       (px_mmcm),
          .CLKFBOUTB      (),
-         .CLKOUT0        (rx_pllmmcm_div2),
+         .CLKOUT0        (mmcm_div2),
          .CLKOUT0B       (),
          .CLKOUT1        (),
          .CLKOUT1B       (),
@@ -78,16 +91,15 @@ begin    // use an MMCM
     );
 end
 endgenerate
-
 //-----------------------------------------------------------------------------
 // Global Clock Buffers
-BUFG  bg_px     (.I(px_pllmmcm),      .O(px_clk)) ;
+BUFG  px     (.I(px_mmcm),      .O(px_clk)) ;
 
-BUFG  bg_rxdiv2 (.I(rx_pllmmcm_div2), .O(rx_clkdiv2)) ;
+BUFG  div2   (.I(mmcm_div2), .O(rx_clkdiv2)) ;
 
 BUFGCE_DIV  # ( .BUFGCE_DIVIDE(4))
-clkdiv8 (
-       .I(rx_pllmmcm_div2),
+      clkdiv8 (
+       .I(mmcm_div2),
        .CLR(!cmt_locked),
        .CE(1'b1),
        .O(rx_clkdiv8)
@@ -193,8 +205,6 @@ begin
        px_reset_sync <= {1'b0,px_reset_sync[3:1]};
 end
 assign px_reset = px_reset_sync[0];
-
-
 
 //-----------------------------------------------------------------------------
 //  RX write address counter
@@ -374,17 +384,6 @@ always @ (posedge px_clk) begin
             px_state      <= px_state + 1'b1;   // Increment to next state
          end
       endcase
-   end
-end
-//-----------------------------------------------------------------------------
-// Asynchronous reset for px_ready output
-
-always @ (posedge px_clk or posedge px_reset) begin
-   if (px_reset) begin
-      px_ready   <= 3'h0;
-   end
-   else begin
-      px_ready   <= px_ready_int;
    end
 end
 
