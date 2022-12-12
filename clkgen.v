@@ -1,23 +1,23 @@
 
 `timescale 1ps/1ps
 
-module rx_clkgen_1to7 # (
+module clkgen # (
       parameter real    CLKIN_PERIOD = 6.600,        // Clock period (ns) of input clock on clkin_p
-      parameter real    REF_FREQ     = 300.0,        // Reference clock frequency for idelay control
+      //parameter real    REF_FREQ     = 300.0,        // Reference clock frequency for idelay control
       parameter         CLK_PATTERN  = 7'b110_0011,   // Clock pattern for alignment
    )
    (
       input             clkin_p,              // Clock input LVDS P-side
       input             clkin_n,              // Clock input LVDS N-side
       input             reset,                // Asynchronous interface reset
-      input             idelay_rdy,           // Asyncrhonous IDELAYCRL ready
+      //input             idelay_rdy,           // Asyncrhonous IDELAYCRL ready
       //
       output            rx_clkdiv2,           // RX clock div2 output
       output            rx_clkdiv8,           // RX clock div8 output
       output            cmt_locked,           // PLL/MMCM locked output
       output     [4:0]  rx_wr_addr,           // RX write_address output
-      output reg [8:0]  rx_cntval,            // RX input delay count value output
-      output reg        rx_dlyload,           // RX input delay load output
+      //output reg [8:0]  rx_cntval,            // RX input delay count value output
+     // output reg        rx_dlyload,           // RX input delay load output
       output            rx_reset,             // RX reset output
       output reg        rx_ready,             // RX ready output
       //
@@ -33,7 +33,7 @@ module rx_clkgen_1to7 # (
 //  1  - if clock period is <= 600 MHz/7  
 //
 localparam VCO_MULTIPLIER = (CLKIN_PERIOD >11.666) ? 2 : 1 ;
-localparam DELAY_VALUE    = ((CLKIN_PERIOD*1000)/7 <= 1250.0) ? (CLKIN_PERIOD*1000)/7 : 1250.0;
+//localparam DELAY_VALUE    = ((CLKIN_PERIOD*1000)/7 <= 1250.0) ? (CLKIN_PERIOD*1000)/7 : 1250.0;
 //localparam DELAY_VALUE    = (SIM_DEVICE = "ULTRASCALE") ? (((CLKIN_PERIOD*1000)/7 <= 1250.0 ) ? (CLKIN_PERIOD*1000)/7 : 1250.0) : 0;
 //localparam DELAY_VALUE    = (((CLKIN_PERIOD*1000)/7 <= 1250.0) && SIM_DEVICE = "ULTRASCALE") ? (CLKIN_PERIOD*1000)/7 : 1250.0;
 
@@ -91,10 +91,8 @@ reg        px_ready_int;
 //
 // Clock input
 //
-IBUFGDS_DIFF_OUT # (
-      .DIFF_TERM        (DIFF_TERM)
-   )
-   iob_clk_in (
+IBUFGDS_DIFF_OUT # ( .DIFF_TERM   (DIFF_TERM) )
+   clk_input (
       .I                (clkin_p),
       .IB               (clkin_n),
       .O                (clkin_p_i),
@@ -102,7 +100,7 @@ IBUFGDS_DIFF_OUT # (
    );
 
 //
-// Instantitate a PLL or a MMCM
+// Instantitate a MMCM
 //
 generate
 begin    // use an MMCM
@@ -145,15 +143,13 @@ endgenerate
 //
 BUFG  bg_px     (.I(px_pllmmcm),      .O(px_clk)) ;
 BUFG  bg_rxdiv2 (.I(rx_pllmmcm_div2), .O(rx_clkdiv2)) ;
-BUFGCE_DIV  # (
-       .BUFGCE_DIVIDE(4)
-     )
-     bg_rxdiv8 (
+BUFGCE_DIV  # ( .BUFGCE_DIVIDE(4))
+   bg_rxdiv8 (
        .I(rx_pllmmcm_div2),
        .CLR(!cmt_locked),
        .CE(1'b1),
        .O(rx_clkdiv8)
-      );
+   );
 
 //
 // Synchronize locked to rx_clkdiv8
