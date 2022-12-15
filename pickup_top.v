@@ -4,8 +4,8 @@
 // Version:         1.0
 // Filename:        pickup_top .v
 // Date Created:    12/07/2022
-// Device:          ZYNQ7020
-// IDE:             Vivado 2018.3
+// Device:          ZYNQ7020/ZYNQ7030/ZYNQ7035+
+// IDE:             Vivado 2018.3+
 // Purpose:         Design for LVDS interface
 //////////////////////////////////////////////////////////////////////////////
 
