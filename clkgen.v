@@ -20,8 +20,8 @@ module clkgen # (
       input             clkin_n,              // Clock input LVDS N-side
       input             reset,                // Asynchronous interface reset
 
-      output            rx_clkdiv2,           // RX clock div2 output
-      output            rx_clkdiv6,           // RX clock div6 output
+      output            clkdiv2,              //  Clock div2 output
+      output            clkdiv6,              //  Clock div6 output
 
       output            cmt_locked,           // PLL/MMCM locked output
       output     [4:0]  rx_wr_addr,           // RX write_address output
@@ -41,13 +41,13 @@ wire       mmcm_px;         // Mixed Mode clock Manager clock output
 wire       mmcm_div2;       // Mixed Mode clock Manager clock output
 
 reg  [3:0] rx_reset_sync;
-reg  [3:0] px_reset_sync;
+reg  [3:0] px_reset_sync; 
 //-----------------------------------------------------------------------------
-// Clock input global diff buffer
-BUFG 
-//-----------------------------------------------------------------------------
-// Clock input global diff buffer
-IBUFGDS_DIFF_OUT # ( .DIFF_TERM   (DIFF_TERM) )
+// Clock input global diff buffer,UG471,page 37 
+IBUFGDS_DIFF_OUT # ( 
+   .DIFF_TERM   (TRUE) , 
+   .IBUF_LOW_PWR (TRUE), 
+   .IOSTANDARD ("DEFAULT") )
    clk_input (
       .I                (clkin_p),
       .IB               (clkin_n),
@@ -55,19 +55,22 @@ IBUFGDS_DIFF_OUT # ( .DIFF_TERM   (DIFF_TERM) )
       .OB               (clkin_n_i)
    );
 //-----------------------------------------------------------------------------
-// Instantitate a MMCM
+// Instantitate a MMCME2_BASE,7 series
 generate
 begin
-   MMCME3_BASE # (
+   MMCME2_BASE # (
          .BANDWIDTH          ("OPTIMIZED"),             // String Vaule, "OPTIMIZED","HIGH","LOW"; default "OPTIMIZED"
          .CLKFBOUT_MULT_F    (6*VCO_MULTIPLIER),        // Spicifies the amount to multiply all CLKOUT clock outputs if a different frequency is desired;2.000 to 64.000,default 5.000
          .CLKFBOUT_PHASE     (0.0),                     // Specifies the phase offset in degrees of the clock feedback output; -360.000 to 360.000,default 0.000
          .CLKIN1_PERIOD      (CLKIN_PERIOD),            // Specifies the input period in ns to the MMCM CLKIN1 input; 0.000 to 100.000 nS
+         //.CLKOUT0_DIVIDE     (),                        // Specifies the amount to divide CLKOUT1 to create a different frequency;1 to 128,default 1
+         .CLKOUT1_DIVIDE     (),                        
+         .CLKOUT2_DIVIDE     (),
+         .CLKOUT3_DIVIDE     (),
+         .CLKOUT4_DIVIDE     (),
+         .CLKOUT5_DIVIDE     (),
+         .CLKOUT6_DIVIDE     (),
          .CLKOUT0_DIVIDE_F   (2*VCO_MULTIPLIER),        // Specified the amount to divide the associated CLKOUT clock output if a different frequency is desired; 1.000 to 128.000, default 1.000
-         .CLKOUT4_CASCADE    ("FALSE"),                 // Cascades the output divider (counter) CLKOUT6 into the input of the CLKOUT4 divider for an output clock divider that is greater than 128; String,"FALSE","TRUE",default "FALSE"
-         .DIVCLK_DIVIDE      (1),                       // Specifies the division ratio for all output clocks with respect to the input clock;1 to 106,default 1
-         .REF_JITTER1(0.0),                             // Reference input jitter in UI (0.000-0.999)    
-         .STARTUP_WAIT("FALSE"),                        // Delays DONE until MMCM is locked (FALSE, TRUE)
          .CLKOUT0_DUTY_CYCLE (0.5),                     // Specifies the duty cycle for CLKOUT0;0.001 to 0.999,default 0.5
          .CLKOUT1_DUTY_CYCLE (),
          .CLKOUT2_DUTY_CYCLE (),
@@ -82,18 +85,10 @@ begin
          .CLKOUT4_PHASE      (),
          .CLKOUT5_PHASE      (),
          .CLKOUT6_PHASE      (),
-         .CLKOUT1_DIVIDE     (),                        // Specifies the amount to divide CLKOUT1 to create a different frequency;1 to 128,default 1
-         .CLKOUT2_DIVIDE     (),
-         .CLKOUT3_DIVIDE     (),
-         .CLKOUT4_DIVIDE     (),
-         .CLKOUT5_DIVIDE     (),
-         .CLKOUT6_DIVIDE     (),
-   // Programmable Inversion Attributes: Specifies built-in programmable inversion on specific pins    
-         .IS_CLKFBIN_INVERTED(1'b0),                    // Optional inversion for CLKFBIN
-         .IS_CLKIN1_INVERTED(1'b0),                     // Optional inversion for CLKIN1    
-         .IS_PWRDWN_INVERTED(1'b0),                     // Optional inversion for PWRDWN    
-         .IS_RST_INVERTED(1'b0)                        // Optional inversion for RST
-    )
+         .CLKOUT4_CASCADE    ("FALSE"),                 // Cascades the output divider (counter) CLKOUT6 into the input of the CLKOUT4 divider for an output clock divider that is greater than 128; String,"FALSE","TRUE",default "FALSE"
+         .DIVCLK_DIVIDE      (1),                       // Specifies the division ratio for all output clocks with respect to the input clock;1 to 106,default 1
+         .REF_JITTER1(0.0),                             // Reference input jitter in UI (0.000-0.999)    
+         .STARTUP_WAIT("FALSE") )                        // Delays DONE until MMCM is locked (FALSE, TRUE)
    mmcm0 (
    // Input    
          .CLKIN1         (clkin_p_i),     // General clock input
@@ -122,14 +117,15 @@ endgenerate
 // Global Clock Buffers
 BUFG  px     (.I(mmcm_px),      .O(px_clk)) ;
 
-BUFG  div2   (.I(mmcm_div2), .O(rx_clkdiv2)) ;
-
+BUFG  div2   (.I(mmcm_div2), .O(clkdiv2)) ;
+//-----------------------------------------------------------------------------
+// Global Clock Bufferred divider
 BUFGCE_DIV  # ( .BUFGCE_DIVIDE(3))
       clkdiv8 (
        .I(mmcm_div2),
        .CLR(!cmt_locked),
        .CE(1'b1),
-       .O(rx_clkdiv6)
+       .O(clkdiv6)
 );
 //-----------------------------------------------------------------------------
 // Asynchronous reset for px_ready output
@@ -152,9 +148,9 @@ ISERDESE3 #(
    iserdes_m (
        .D              (),
        .RST            (rx_reset),
-       .CLK            ( rx_clkdiv2),
-       .CLK_B          (~rx_clkdiv2),
-       .CLKDIV         ( rx_clkdiv6),
+       .CLK            ( clkdiv2),
+       .CLK_B          (~clkdiv2),
+       .CLKDIV         ( clkdiv6),
        .Q              (Mstr_Data),
        .FIFO_RD_CLK    (1'b0),
        .FIFO_RD_EN     (1'b0),
@@ -172,9 +168,9 @@ ISERDESE3 #(
    iserdes_s (
        .D              (),
        .RST            (rx_reset),
-       .CLK            ( rx_clkdiv2),
-       .CLK_B          (~rx_clkdiv2),
-       .CLKDIV         ( rx_clkdiv6),
+       .CLK            ( clkdiv2),
+       .CLK_B          (~clkdiv2),
+       .CLKDIV         ( clkdiv6),
        .Q              (Slve_Data_inv),
        .FIFO_RD_CLK    (1'b0),
        .FIFO_RD_EN     (1'b0),
@@ -182,8 +178,8 @@ ISERDESE3 #(
        .INTERNAL_DIVCLK()
    );
 //-----------------------------------------------------------------------------
-// Synchronize locked to rx_clkdiv6
-always @ (posedge rx_clkdiv6 or negedge cmt_locked)
+// Synchronize locked to clkdiv6
+always @ (posedge clkdiv6 or negedge cmt_locked)
 begin
    if (!cmt_locked)
        rx_reset_sync <= 4'b1111;
@@ -203,7 +199,7 @@ end
 assign px_reset = px_reset_sync[0];
 //-----------------------------------------------------------------------------
 //  RX write address counter
-always @ (posedge rx_clkdiv6)
+always @ (posedge clkdiv6)
 begin
     if (rx_reset)
         rx_wr_count <= 5'h4;
@@ -226,7 +222,7 @@ end
 assign px_rd_addr = px_rd_count;
 //-----------------------------------------------------------------------------
 // Register data from ISERDES
-always @ (posedge rx_clkdiv6)
+always @ (posedge clkdiv6)
 begin
    rx_wr_data <= Mstr_Data;
 end
@@ -237,7 +233,7 @@ generate
 for (i = 0 ; i < 8 ; i = i+1) begin : bit
   RAM32X1D fifo (
      .D     (rx_wr_data[i]),
-     .WCLK  (rx_clkdiv6),
+     .WCLK  (clkdiv6),
      .WE    (1'b1),
      .A4    (rx_wr_addr[4]),
      .A3    (rx_wr_addr[3]),
