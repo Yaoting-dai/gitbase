@@ -56,8 +56,6 @@ IBUFGDS_DIFF_OUT # (
    );
 //-----------------------------------------------------------------------------
 // Instantitate a MMCME2_BASE,7 series
-generate
-begin
    MMCME2_BASE # (
          .BANDWIDTH          ("OPTIMIZED"),             // String Vaule, "OPTIMIZED","HIGH","LOW"; default "OPTIMIZED"
          .CLKFBOUT_MULT_F    (6*VCO_MULTIPLIER),        // Spicifies the amount to multiply all CLKOUT clock outputs if a different frequency is desired;2.000 to 64.000,default 5.000
@@ -111,8 +109,6 @@ begin
          .CLKFBOUTB      (),              // Inverted CLKFBOUT output
          .LOCKED         (cmt_locked)     // MMCM nust be rest after LOCKED is desserted
     );
-end
-endgenerate
 //-----------------------------------------------------------------------------
 // Global Clock Buffers
 BUFG  px     (.I(mmcm_px),      .O(px_clk)) ;
